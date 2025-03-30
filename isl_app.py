@@ -307,6 +307,8 @@ class Application:
         if self.current_prediction != self.current_symbol:
             self.current_prediction = self.current_symbol
             self.prediction_start_time = current_time
+            # Reset the counter for character repetition
+            self.character_ready = False
         else:
             # Same prediction continues
             elapsed_time = current_time - self.prediction_start_time
@@ -319,12 +321,21 @@ class Application:
                 self.word = " "  # Reset to a single space instead of empty string
                 self.prediction_start_time = current_time  # Reset timer
                 self.last_added_symbol = None
+                self.character_ready = False
             
             # If any letter is predicted for more than 2 seconds
-            elif self.current_symbol != 'blank' and elapsed_time > 2.0 and self.current_symbol != self.last_added_symbol:
-                self.word += self.current_symbol
-                self.last_added_symbol = self.current_symbol
-                self.prediction_start_time = current_time  # Reset timer
+            elif self.current_symbol != 'blank' and elapsed_time > 2.0:
+                # If we've waited long enough, add the character
+                if not self.character_ready:
+                    self.word += self.current_symbol
+                    self.character_ready = True  # Mark that we've added this instance
+                    # Don't update last_added_symbol - that would prevent repetition
+                
+                # If we continue showing the same symbol for another 2 seconds after adding it once
+                elif elapsed_time > 4.0:  # Original 2 seconds + 2 more seconds
+                    self.word += self.current_symbol  # Add the character again
+                    self.prediction_start_time = current_time  # Reset timer for next potential repeat
+                    self.character_ready = False  # Reset ready state for next cycle
     
     def action1(self):
         if self.word.strip():  # Check if word is not empty
