@@ -97,6 +97,11 @@ class Application:
         for i in ascii_uppercase:
             self.ct[i] = 0
         
+        # Time tracking for predictions
+        self.prediction_start_time = None
+        self.current_prediction = None
+        self.last_added_symbol = None
+        
         print("Models loaded from disk")
         
         # Setup GUI
@@ -159,7 +164,7 @@ class Application:
         
         # Initialize text variables
         self.str = ""
-        self.word = " "
+        self.word = " "  # Initialize with a space instead of empty string
         self.current_symbol = "Empty"
         self.photo = "Empty"
         
@@ -209,22 +214,34 @@ class Application:
             self.panel4.config(text=self.word, font=("Courier", 30))
             self.panel5.config(text=self.str, font=("Courier", 30))
             
-            # Update suggestions
-            predicts = self.spell.suggest(self.word)
-            
-            if len(predicts) > 0:
-                self.bt1.config(text=predicts[0], font=("Courier", 20))
+            # Update suggestions - check for empty word first
+            if self.word.strip():  # Only get suggestions if word is not empty or just spaces
+                try:
+                    predicts = self.spell.suggest(self.word.strip())
+                    
+                    if len(predicts) > 0:
+                        self.bt1.config(text=predicts[0], font=("Courier", 20))
+                    else:
+                        self.bt1.config(text="")
+                        
+                    if len(predicts) > 1:
+                        self.bt2.config(text=predicts[1], font=("Courier", 20))
+                    else:
+                        self.bt2.config(text="")
+                        
+                    if len(predicts) > 2:
+                        self.bt3.config(text=predicts[2], font=("Courier", 20))
+                    else:
+                        self.bt3.config(text="")
+                except Exception as e:
+                    print(f"Error getting suggestions: {str(e)}")
+                    self.bt1.config(text="")
+                    self.bt2.config(text="")
+                    self.bt3.config(text="")
             else:
+                # Clear suggestion buttons if word is empty
                 self.bt1.config(text="")
-                
-            if len(predicts) > 1:
-                self.bt2.config(text=predicts[1], font=("Courier", 20))
-            else:
                 self.bt2.config(text="")
-                
-            if len(predicts) > 2:
-                self.bt3.config(text=predicts[2], font=("Courier", 20))
-            else:
                 self.bt3.config(text="")
         
         self.root.after(5, self.video_loop)
@@ -283,63 +300,67 @@ class Application:
             else:
                 self.current_symbol = prediction[0][0]
         
-        # Process the predicted symbol
-        if self.current_symbol == 'blank':
-            for i in ascii_uppercase:
-                self.ct[i] = 0
+        # Time-based prediction tracking
+        current_time = time.time()
         
-        self.ct[self.current_symbol] += 1
-        
-        if self.ct[self.current_symbol] > 60:
-            for i in ascii_uppercase:
-                if i == self.current_symbol:
-                    continue
-                tmp = self.ct[self.current_symbol] - self.ct[i]
-                if tmp < 0:
-                    tmp *= -1
-                if tmp <= 20:
-                    self.ct['blank'] = 0
-                    for i in ascii_uppercase:
-                        self.ct[i] = 0
-                    return
+        # If this is a new prediction or a different prediction than the last one
+        if self.current_prediction != self.current_symbol:
+            self.current_prediction = self.current_symbol
+            self.prediction_start_time = current_time
+        else:
+            # Same prediction continues
+            elapsed_time = current_time - self.prediction_start_time
             
-            self.ct['blank'] = 0
-            for i in ascii_uppercase:
-                self.ct[i] = 0
+            # If 'blank' (space) is predicted for more than 3 seconds
+            if self.current_symbol == 'blank' and elapsed_time > 3.0 and self.word.strip():
+                if self.str:
+                    self.str += " "
+                self.str += self.word.strip()
+                self.word = " "  # Reset to a single space instead of empty string
+                self.prediction_start_time = current_time  # Reset timer
+                self.last_added_symbol = None
             
-            if self.current_symbol == 'blank':
-                if self.blank_flag == 0:
-                    self.blank_flag = 1
-                    if len(self.str) > 0:
-                        self.str += " "
-                    self.str += self.word
-                    self.word = ""
-            else:
-                if len(self.str) > 16:
-                    self.str = ""
-                self.blank_flag = 0
+            # If any letter is predicted for more than 2 seconds
+            elif self.current_symbol != 'blank' and elapsed_time > 2.0 and self.current_symbol != self.last_added_symbol:
                 self.word += self.current_symbol
+                self.last_added_symbol = self.current_symbol
+                self.prediction_start_time = current_time  # Reset timer
     
     def action1(self):
-        predicts = self.spell.suggest(self.word)
-        if len(predicts) > 0:
-            self.word = ""
-            self.str += " "
-            self.str += predicts[0]
+        if self.word.strip():  # Check if word is not empty
+            try:
+                predicts = self.spell.suggest(self.word.strip())
+                if len(predicts) > 0:
+                    if self.str:
+                        self.str += " "
+                    self.str += predicts[0]
+                    self.word = " "  # Reset to space instead of empty string
+            except Exception as e:
+                print(f"Error in action1: {str(e)}")
     
     def action2(self):
-        predicts = self.spell.suggest(self.word)
-        if len(predicts) > 1:
-            self.word = ""
-            self.str += " "
-            self.str += predicts[1]
+        if self.word.strip():  # Check if word is not empty
+            try:
+                predicts = self.spell.suggest(self.word.strip())
+                if len(predicts) > 1:
+                    if self.str:
+                        self.str += " "
+                    self.str += predicts[1]
+                    self.word = " "  # Reset to space instead of empty string
+            except Exception as e:
+                print(f"Error in action2: {str(e)}")
     
     def action3(self):
-        predicts = self.spell.suggest(self.word)
-        if len(predicts) > 2:
-            self.word = ""
-            self.str += " "
-            self.str += predicts[2]
+        if self.word.strip():  # Check if word is not empty
+            try:
+                predicts = self.spell.suggest(self.word.strip())
+                if len(predicts) > 2:
+                    if self.str:
+                        self.str += " "
+                    self.str += predicts[2]
+                    self.word = " "  # Reset to space instead of empty string
+            except Exception as e:
+                print(f"Error in action3: {str(e)}")
     
     def destructor(self):
         print("Closing Application...")
@@ -349,4 +370,4 @@ class Application:
 
 if __name__ == "__main__":
     print("Starting Application...")
-    (Application()).root.mainloop() 
+    (Application()).root.mainloop()
